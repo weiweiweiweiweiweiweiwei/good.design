@@ -1,0 +1,771 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>互動式簡報：隨堂測驗版</title>
+    <!-- Google Fonts -->
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Noto+Sans+TC:wght@400;500;700&display=swap"
+        rel="stylesheet">
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+    <style>
+        /* =========================================
+           1. 基礎設定 (Base)
+           ========================================= */
+        :root {
+            --bg-main: #131314;
+            --card-bg: #1e1e1e;
+            --text-primary: #e3e3e3;
+            --text-secondary: #c4c7c5;
+            --accent-color: #a8c7fa;
+            --accent-dark: #062e6f;
+            --success-border: #6dd58c;
+            --success-bg: rgba(109, 213, 140, 0.1);
+            --error-border: #e25c5d;
+            --error-bg: rgba(226, 92, 93, 0.1);
+            --border-dim: #444746;
+        }
+
+        body {
+            margin: 0;
+            background-color: var(--bg-main);
+            color: var(--text-primary);
+            font-family: 'Inter', 'Noto Sans TC', sans-serif;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+        }
+
+        /* 通用隱藏類別 */
+        .hidden {
+            display: none !important;
+        }
+
+        /* 淡入動畫 */
+        .fade-in {
+            animation: fadeIn 0.6s ease forwards;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+            }
+
+            to {
+                opacity: 1;
+            }
+        }
+
+        /* =========================================
+           2. 簡報播放器 (Slideshow)
+           ========================================= */
+        #presentation-view {
+            width: 100%;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            background: #000;
+        }
+
+        .slide-container {
+            position: relative;
+            max-width: 100%;
+            max-height: 85vh;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.6);
+            display: flex;
+            justify-content: center;
+        }
+
+        .slide-img {
+            max-width: 100%;
+            max-height: 85vh;
+            display: block;
+            object-fit: contain;
+            transition: opacity 0.3s ease;
+        }
+
+        .slide-controls {
+            position: absolute;
+            bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            padding: 10px 20px;
+            background: rgba(30, 30, 30, 0.8);
+            border-radius: 50px;
+            backdrop-filter: blur(5px);
+            z-index: 20;
+        }
+
+        .slide-btn {
+            background: transparent;
+            border: 1px solid var(--text-secondary);
+            color: var(--text-primary);
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: 0.2s;
+        }
+
+        .slide-btn:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        /* 點擊熱區 */
+        .click-zone {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            width: 20%;
+            z-index: 10;
+            cursor: pointer;
+        }
+
+        .click-zone.left {
+            left: 0;
+        }
+
+        .click-zone.right {
+            right: 0;
+        }
+
+        /* =========================================
+           3. 隨堂測驗模態框 (Pop Quiz Overlay)
+           ========================================= */
+        #quiz-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100vh;
+            background: rgba(19, 19, 20, 0.95);
+            backdrop-filter: blur(10px);
+            z-index: 100;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .quiz-card {
+            width: 90%;
+            max-width: 800px;
+            background: var(--card-bg);
+            border: 1px solid var(--border-dim);
+            border-radius: 16px;
+            padding: 40px;
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+            animation: popUp 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        @keyframes popUp {
+            from {
+                transform: scale(0.9);
+                opacity: 0;
+            }
+
+            to {
+                transform: scale(1);
+                opacity: 1;
+            }
+        }
+
+        .quiz-header-badge {
+            display: inline-block;
+            background: var(--accent-color);
+            color: var(--accent-dark);
+            padding: 4px 12px;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            margin-bottom: 20px;
+            text-transform: uppercase;
+        }
+
+        .question-text {
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin-bottom: 30px;
+            line-height: 1.5;
+        }
+
+        .option-card {
+            padding: 18px 20px;
+            border: 1px solid var(--border-dim);
+            border-radius: 10px;
+            margin-bottom: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .option-card:hover {
+            background: rgba(255, 255, 255, 0.05);
+            transform: translateX(5px);
+        }
+
+        .option-card.correct {
+            border-color: var(--success-border);
+            background: var(--success-bg);
+        }
+
+        .option-card.wrong {
+            border-color: var(--error-border);
+            background: var(--error-bg);
+        }
+
+        .explanation {
+            margin-top: 10px;
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            padding-top: 10px;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            display: none;
+        }
+
+        .quiz-actions {
+            margin-top: 30px;
+            text-align: right;
+        }
+
+        .btn-primary {
+            background: var(--accent-color);
+            color: var(--accent-dark);
+            border: none;
+            padding: 12px 30px;
+            border-radius: 50px;
+            font-weight: 600;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: 0.2s;
+        }
+
+        .btn-primary:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            filter: grayscale(1);
+        }
+
+        .btn-primary:not(:disabled):hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(168, 199, 250, 0.3);
+        }
+
+        /* =========================================
+           4. 結算與重點整理 (Summary View)
+           ========================================= */
+        #summary-view {
+            width: 100%;
+            max-width: 900px;
+            height: 100vh;
+            overflow-y: auto;
+            /* 允許內容過長時滾動 */
+            padding: 40px 20px;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* 隱藏滾動條但保留功能 */
+        #summary-view::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        #summary-view::-webkit-scrollbar-track {
+            background: var(--bg-main);
+        }
+
+        #summary-view::-webkit-scrollbar-thumb {
+            background: var(--border-dim);
+            border-radius: 4px;
+        }
+
+        .summary-header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        .summary-title {
+            font-size: 2.2rem;
+            margin-bottom: 10px;
+        }
+
+        .summary-subtitle {
+            color: var(--text-secondary);
+        }
+
+        .stats-row {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            margin-bottom: 50px;
+        }
+
+        .stat-box {
+            background: var(--card-bg);
+            padding: 20px 40px;
+            border-radius: 12px;
+            text-align: center;
+            border: 1px solid var(--border-dim);
+        }
+
+        .stat-val {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: var(--accent-color);
+        }
+
+        .stat-label {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+        }
+
+        /* 重點整理動畫區 */
+        .key-points-section {
+            margin-bottom: 50px;
+        }
+
+        .section-title {
+            font-size: 1.2rem;
+            border-left: 4px solid var(--accent-color);
+            padding-left: 15px;
+            margin-bottom: 25px;
+            color: var(--text-primary);
+        }
+
+        .point-item {
+            background: rgba(255, 255, 255, 0.03);
+            border-left: 1px solid var(--border-dim);
+            padding: 20px;
+            margin-bottom: 15px;
+            border-radius: 0 8px 8px 0;
+            opacity: 0;
+            transform: translateY(20px);
+            /* 初始隱藏 */
+            transition: 0.5s ease;
+        }
+
+        .point-item.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .point-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: var(--accent-color);
+        }
+
+        .point-content {
+            font-size: 0.95rem;
+            color: var(--text-secondary);
+            line-height: 1.6;
+        }
+
+        .restart-area {
+            text-align: center;
+            margin-top: auto;
+            padding-bottom: 20px;
+        }
+
+        .btn-outline {
+            background: transparent;
+            border: 1px solid var(--border-dim);
+            color: var(--text-secondary);
+            padding: 10px 25px;
+            border-radius: 50px;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+
+        .btn-outline:hover {
+            border-color: var(--text-primary);
+            color: var(--text-primary);
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- 1. 簡報層 -->
+    <div id="presentation-view">
+        <div class="click-zone left" onclick="prevSlide()"></div>
+        <div class="click-zone right" onclick="handleSlideNext()"></div>
+
+        <div class="slide-container">
+            <img src="簡報 (1).jpg" id="current-slide" class="slide-img" alt="Slide">
+        </div>
+
+        <div class="slide-controls">
+            <button class="slide-btn" onclick="prevSlide()"><i class="fas fa-chevron-left"></i></button>
+            <span id="slide-indicator" style="color:white; font-size:0.9rem;">1 / 20</span>
+            <button class="slide-btn" onclick="handleSlideNext()"><i class="fas fa-chevron-right"></i></button>
+        </div>
+    </div>
+
+    <!-- 2. 隨堂測驗層 (預設隱藏) -->
+    <div id="quiz-overlay" class="hidden">
+        <div class="quiz-card">
+            <div class="quiz-header-badge">隨堂測驗 <span id="quiz-badge-count">1</span></div>
+            <div class="question-text" id="quiz-question">題目載入中...</div>
+            <div id="quiz-options"></div>
+
+            <div class="quiz-actions">
+                <button class="btn-primary" id="quiz-continue-btn" onclick="completeQuizAndContinue()" disabled>
+                    下一張簡報 <i class="fas fa-arrow-right"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 3. 結算與總結層 (預設隱藏) -->
+    <div id="summary-view" class="hidden">
+        <div class="summary-header fade-in">
+            <h1 class="summary-title">課程結束！</h1>
+            <p class="summary-subtitle">感謝您的專注參與，以下是您的學習成果與重點整理</p>
+        </div>
+
+        <!-- 分數顯示 -->
+        <div class="stats-row fade-in" style="animation-delay: 0.2s;">
+            <div class="stat-box">
+                <div class="stat-val" id="final-score">0</div>
+                <div class="stat-label">答對題數</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-val" id="final-accuracy">0%</div>
+                <div class="stat-label">正確率</div>
+            </div>
+        </div>
+
+        <!-- 動畫重點整理 -->
+        <div class="key-points-section">
+            <div class="section-title fade-in" style="animation-delay: 0.4s;">
+                <i class="fas fa-star"></i> 課程重點回顧
+            </div>
+            <div id="key-points-container">
+                <!-- JS 動態生成 -->
+            </div>
+        </div>
+
+        <div class="restart-area fade-in" style="animation-delay: 1.5s;">
+            <button class="btn-outline" onclick="location.reload()">
+                <i class="fas fa-redo"></i> 重新開始
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // ==========================
+        // 資料設定
+        // ==========================
+        const TOTAL_SLIDES = 20;
+        const SLIDES_PER_QUIZ = 4; // 每4張簡報一次測驗
+
+        // 測驗題目 (共5題，對應第 4, 8, 12, 16, 20 張後的休息點)
+        const quizData = [
+            {
+                question: "【Part 1 回顧】根據食物產熱效應 (TEF)，哪種營養素消耗能量最多？",
+                options: ["水", "脂肪", "蛋白質", "碳水化合物"],
+                correct: 2,
+                explanation: "沒錯！蛋白質消化時會消耗其攝入熱量的 20-30%，是提升代謝的關鍵。"
+            },
+            {
+                question: "【Part 2 回顧】關於基礎代謝率 (BMR)，下列何者正確？",
+                options: ["BMR 佔每日總熱量消耗約 10%", "即使不動，BMR 也消耗每日最大宗熱量", "更年期後 BMR 會自然上升", "節食能提升 BMR"],
+                correct: 1,
+                explanation: "正確。BMR (基礎代謝) 佔了每日消耗的 60-70%，維持生命徵象非常耗能。"
+            },
+            {
+                question: "【Part 3 回顧】提升「代謝靈活性」的最佳飲食策略是？",
+                options: ["只吃單一食物", "高頻率攝取糖分", "優質蛋白質 + 纖維", "完全不吃脂肪"],
+                correct: 2,
+                explanation: "蛋白質與纖維能穩定血糖，訓練身體在燃糖與燃脂間自由切換。"
+            },
+            {
+                question: "【Part 4 回顧】睡眠不足為何會導致發胖？",
+                options: ["皮質醇升高，促進囤脂", "睡覺時不燃燒熱量", "睡太少代謝變快", "沒有關聯"],
+                correct: 0,
+                explanation: "睡眠不足會導致壓力荷爾蒙(皮質醇)升高，並擾亂飢餓素，讓你更想吃且更容易囤積脂肪。"
+            },
+            {
+                question: "【Part 5 回顧】哪種運動能產生最強的「後燃效應 (EPOC)」？",
+                options: ["散步", "瑜伽", "高強度間歇 (HIIT)", "冥想"],
+                correct: 2,
+                explanation: "HIIT 能造成大量氧債，讓身體在運動結束後數小時內持續燃燒熱量。"
+            }
+        ];
+
+        // 結尾重點整理資料 (模擬生成)
+        const summaryPoints = [
+            { title: "三大消耗來源", content: "每日熱量消耗由 **BMR (60-70%)**、**活動消耗 (20-30%)** 與 **食物熱效應 (10%)** 組成。提升 BMR 是長期體重管理的關鍵。" },
+            { title: "吃對才瘦得快", content: "善用 **蛋白質** 高產熱效應的特性，並攝取足夠 **纖維**，能有效提升代謝靈活性，避免胰島素震盪。" },
+            { title: "睡眠即減重", content: "睡眠是荷爾蒙重置的黃金時間。缺乏睡眠會導致皮質醇上升，直接阻礙脂肪燃燒並增加食慾。" },
+            { title: "運動的選擇", content: "不只看當下消耗，更要看 **後燃效應**。高強度間歇運動 (HIIT) 與重量訓練能讓代謝引擎在運動後持續運轉。" }
+        ];
+
+        // ==========================
+        // 狀態管理
+        // ==========================
+        let currentSlide = 1;
+        let score = 0;
+        let quizIndex = 0; // 目前進行到第幾個測驗 (0-4)
+        let quizCompletedForBlock = false; // 紀錄當前區塊的測驗是否已完成
+
+        // DOM 元素
+        const slideView = document.getElementById('presentation-view');
+        const slideImg = document.getElementById('current-slide');
+        const slideIndicator = document.getElementById('slide-indicator');
+
+        const quizOverlay = document.getElementById('quiz-overlay');
+        const summaryView = document.getElementById('summary-view');
+
+        // 初始化
+        window.onload = function () {
+            preloadImages();
+            updateSlideUI();
+        };
+
+        // 預載圖片
+        function preloadImages() {
+            for (let i = 1; i <= TOTAL_SLIDES; i++) {
+                const img = new Image();
+                img.src = `簡報 (${i}).jpg`;
+            }
+        }
+
+        // ==========================
+        // 簡報邏輯
+        // ==========================
+        function updateSlideUI() {
+            slideImg.style.opacity = 0.5;
+            setTimeout(() => {
+                slideImg.src = `簡報 (${currentSlide}).jpg`;
+                slideImg.style.opacity = 1;
+            }, 100);
+            slideIndicator.innerText = `${currentSlide} / ${TOTAL_SLIDES}`;
+        }
+
+        function handleSlideNext() {
+            // 檢查是否遇到測驗點 (4, 8, 12, 16, 20)
+            // 邏輯：如果是第4張，且該區塊測驗尚未完成 -> 進入測驗
+            if (currentSlide % SLIDES_PER_QUIZ === 0 && !quizCompletedForBlock) {
+                triggerPopQuiz();
+                return;
+            }
+
+            // 正常換頁
+            if (currentSlide < TOTAL_SLIDES) {
+                currentSlide++;
+                quizCompletedForBlock = false; // Reset for next block
+                updateSlideUI();
+            } else {
+                // 全部結束 (第20張且測驗也做完了)
+                showFinalSummary();
+            }
+        }
+
+        function prevSlide() {
+            if (currentSlide > 1) {
+                // 如果往回翻，也要重置測驗狀態嗎？通常簡報往回看不需要重測，這裡保持簡單
+                currentSlide--;
+                updateSlideUI();
+            }
+        }
+
+        // 鍵盤支援
+        document.addEventListener('keydown', (e) => {
+            if (!quizOverlay.classList.contains('hidden') || !summaryView.classList.contains('hidden')) return;
+            if (e.key === 'ArrowRight' || e.key === ' ') handleSlideNext();
+            if (e.key === 'ArrowLeft') prevSlide();
+        });
+
+        // ==========================
+        // 測驗邏輯
+        // ==========================
+        function triggerPopQuiz() {
+            // 決定現在是第幾題
+            // 例如 slide 4 -> index 0, slide 8 -> index 1
+            const qIdx = (currentSlide / SLIDES_PER_QUIZ) - 1;
+
+            if (qIdx < quizData.length) {
+                quizIndex = qIdx;
+                renderQuiz(quizData[qIdx]);
+                slideView.classList.add('hidden'); // 暫時隱藏簡報
+                quizOverlay.classList.remove('hidden'); // 顯示測驗
+            }
+        }
+
+        function renderQuiz(data) {
+            document.getElementById('quiz-badge-count').innerText = `${quizIndex + 1} / 5`;
+            document.getElementById('quiz-question').innerText = data.question;
+            const btn = document.getElementById('quiz-continue-btn');
+            const optionsContainer = document.getElementById('quiz-options');
+
+            // 重置按鈕
+            btn.disabled = true;
+            btn.innerHTML = (quizIndex === 4) ? '查看總結 <i class="fas fa-flag-checkered"></i>' : '繼續簡報 <i class="fas fa-arrow-right"></i>';
+            btn.onclick = completeQuizAndContinue; // 重新綁定
+
+            // 生成選項
+            optionsContainer.innerHTML = '';
+            let isAnswered = false;
+
+            data.options.forEach((opt, idx) => {
+                const div = document.createElement('div');
+                div.className = 'option-card';
+                div.innerHTML = `<span>${String.fromCharCode(65 + idx)}. ${opt}</span>
+                                 <div class="explanation"></div>`;
+
+                div.onclick = () => {
+                    if (isAnswered) return;
+                    isAnswered = true;
+                    btn.disabled = false;
+
+                    const explEl = div.querySelector('.explanation');
+                    explEl.style.display = 'block';
+                    explEl.innerText = data.explanation;
+
+                    if (idx === data.correct) {
+                        div.classList.add('correct');
+                        score++;
+                    } else {
+                        div.classList.add('wrong');
+                        // 標記正確答案
+                        const correctDiv = optionsContainer.children[data.correct];
+                        correctDiv.classList.add('correct');
+                        const correctExpl = correctDiv.querySelector('.explanation');
+                        correctExpl.style.display = 'block';
+                        correctExpl.innerText = "正確答案在此";
+                    }
+                };
+                optionsContainer.appendChild(div);
+            });
+        }
+
+        function completeQuizAndContinue() {
+            quizOverlay.classList.add('hidden');
+
+            if (quizIndex === 4) {
+                // 如果是最後一題 (第20頁後的測驗)，直接進結算
+                showFinalSummary();
+            } else {
+                // 繼續下一張簡報
+                slideView.classList.remove('hidden');
+                quizCompletedForBlock = true; // 標記此區塊測驗已過
+                handleSlideNext(); // 自動跳轉到下一張 (例如 4 -> 5)
+            }
+        }
+
+        // ==========================
+        // 結算與動畫邏輯
+        // ==========================
+        function showFinalSummary() {
+            slideView.classList.add('hidden');
+            quizOverlay.classList.add('hidden');
+            summaryView.classList.remove('hidden');
+
+            // 1. 填寫分數
+            document.getElementById('final-score').innerText = `${score} / 5`;
+            document.getElementById('final-accuracy').innerText = `${Math.round((score / 5) * 100)}%`;
+
+            // 2. 生成重點整理 (帶動畫)
+            const container = document.getElementById('key-points-container');
+            container.innerHTML = '';
+
+            summaryPoints.forEach((point, index) => {
+                const item = document.createElement('div');
+                item.className = 'point-item';
+                item.style.transitionDelay = `${0.6 + (index * 0.3)}s`; // 延遲出現
+
+                item.innerHTML = `
+                    <div class="point-header">
+                        <i class="fas fa-check-circle"></i> ${point.title}
+                    </div>
+                    <div class="point-content">
+                        ${point.content.replace(/\*\*(.*?)\*\*/g, '<strong style="color:white;">$1</strong>')}
+                    </div>
+                `;
+                container.appendChild(item);
+
+                // 觸發動畫 (小技巧：利用 setTimeout 讓 DOM 渲染後再加 class)
+                setTimeout(() => {
+                    item.classList.add('visible');
+                }, 100);
+            });
+
+            const duration = 3000;
+            const end = Date.now() + duration;
+
+            (function frame() {
+                confetti({
+                    particleCount: 5,
+                    angle: 60,
+                    spread: 55,
+                    origin: { x: 0 },
+                    colors: ['#a8c7fa', '#6dd58c', '#ffffff'] // 配合你的色系
+                });
+                confetti({
+                    particleCount: 5,
+                    angle: 120,
+                    spread: 55,
+                    origin: { x: 1 },
+                    colors: ['#a8c7fa', '#6dd58c', '#ffffff']
+                });
+
+                if (Date.now() < end) {
+                    requestAnimationFrame(frame);
+                }
+            }());
+        }
+
+        // === 手機滑動支援 ===
+        let touchStartX = 0;
+        let touchEndX = 0;
+        const minSwipeDistance = 50; // 最小滑動距離
+
+        document.addEventListener('touchstart', e => {
+            touchStartX = e.changedTouches[0].screenX;
+        });
+
+        document.addEventListener('touchend', e => {
+            touchEndX = e.changedTouches[0].screenX;
+            handleSwipe();
+        });
+
+        function handleSwipe() {
+            // 只有在簡報模式下才啟用滑動
+            if (!slideView.classList.contains('hidden')) {
+                const distance = touchEndX - touchStartX;
+                if (Math.abs(distance) > minSwipeDistance) {
+                    if (distance < 0) {
+                        // 向左滑 (下一頁)
+                        handleSlideNext();
+                    } else {
+                        // 向右滑 (上一頁)
+                        prevSlide();
+                    }
+                }
+            }
+        }
+
+    </script>
+</body>
+
+</html>
